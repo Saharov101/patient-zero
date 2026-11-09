@@ -1,0 +1,135 @@
+import java.util.*;
+
+/**
+ * Missions 3 and 4. Find a word in a long text.
+ */
+public class Marker {
+
+    /**
+     * Mission 3a. The prefix function of p. pi[i] = the length of the longest proper prefix of p[0..i] that is
+     * also a suffix of p[0..i] ("proper" means shorter than p[0..i] itself).
+     * Example: p = "ACGAC" gives [0, 0, 0, 1, 2]. The last number is the "Border length" line.
+     */
+    public static int[] prefixFunction(String p) {
+        int m = p.length();
+        int[] pi = new int[m];
+        int k = 0;
+
+        for (int i = 1; i < m; i++) {
+            while (k > 0 && p.charAt(i) != p.charAt(k)) {
+                k = pi[k - 1];
+            }
+            if (p.charAt(i) == p.charAt(k)) {
+                k++;
+            }
+            pi[i] = k;
+        }
+        return pi;
+    }
+
+    /**
+     * Mission 3b. KMP. All start positions (counting from 0, in increasing order) where p occurs in text.
+     * Overlapping occurrences count: "ACG" occurs in "ACGACG" at 0 and 3, and "AA" in "AAA" at 0 and 1.
+     * Use the prefix function: the text pointer never goes back. The number of positions is "Marker hits",
+     * the first one is "First hit" (-1 when there is none).
+     */
+    public static int[] findAll(String text, String p) {
+        int n = text.length();
+        int m = p.length();
+        if (m == 0 || n < m) {
+            return new int[0];
+        }
+
+        int[] pi = prefixFunction(p);
+        int[] temp = new int[n];
+        int count = 0;
+        int k = 0;
+
+        for (int i = 0; i < n; i++) {
+            while (k > 0 && text.charAt(i) != p.charAt(k)) {
+                k = pi[k - 1];
+            }
+            if (text.charAt(i) == p.charAt(k)) {
+                k++;
+            }
+            if (k == m) {
+                temp[count++] = i - m + 1;
+                k = pi[k - 1];
+            }
+        }
+        return Arrays.copyOf(temp, count);
+    }
+
+    /**
+     * Mission 4. Rabin-Karp. The number of positions i in a such that the word of k letters starting at i
+     * (a[i..i+k-1]) also occurs somewhere in b. Count positions, not different words. This is the "Shared words" line.
+     */
+    public static int sharedWords(String a, String b, int k) {
+        int na = a.length();
+        int nb = b.length();
+        if (k <= 0 || na < k || nb < k) {
+            return 0;
+        }
+
+        final long BASE = 131L;
+        final long MOD = 1_000_000_007L;
+
+        long top = 1L;
+        for (int i = 1; i < k; i++) {
+            top = (top * BASE) % MOD;
+        }
+
+        // Build map of rolling hashes for all windows of length k in b
+        Map<Long, List<Integer>> bHashes = new HashMap<>();
+        long hb = 0;
+        for (int i = 0; i < k; i++) {
+            hb = (hb * BASE + b.charAt(i)) % MOD;
+        }
+        bHashes.computeIfAbsent(hb, x -> new ArrayList<>()).add(0);
+
+        for (int i = 1; i + k <= nb; i++) {
+            hb = (hb - (b.charAt(i - 1) * top) % MOD + MOD) % MOD;
+            hb = (hb * BASE + b.charAt(i + k - 1)) % MOD;
+            bHashes.computeIfAbsent(hb, x -> new ArrayList<>()).add(i);
+        }
+
+        // Slide window of length k over a and check against bHashes
+        int sharedCount = 0;
+        long ha = 0;
+        for (int i = 0; i < k; i++) {
+            ha = (ha * BASE + a.charAt(i)) % MOD;
+        }
+        if (matchesAny(a, 0, b, bHashes.get(ha), k)) {
+            sharedCount++;
+        }
+
+        for (int i = 1; i + k <= na; i++) {
+            ha = (ha - (a.charAt(i - 1) * top) % MOD + MOD) % MOD;
+            ha = (ha * BASE + a.charAt(i + k - 1)) % MOD;
+            if (matchesAny(a, i, b, bHashes.get(ha), k)) {
+                sharedCount++;
+            }
+        }
+
+        return sharedCount;
+    }
+
+    private static boolean matchesAny(String a, int startA, String b, List<Integer> candidates, int k) {
+        if (candidates == null) {
+            return false;
+        }
+        for (int startB : candidates) {
+            boolean equal = true;
+            for (int offset = 0; offset < k; offset++) {
+                if (a.charAt(startA + offset) != b.charAt(startB + offset)) {
+                    equal = false;
+                    break;
+                }
+            }
+            if (equal) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
